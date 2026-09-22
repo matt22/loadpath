@@ -1,0 +1,68 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getCollection, render } from "astro:content";
+
+export async function getStaticPaths() {
+  const notes = await getCollection("system-design");
+  return notes.map((note) => ({
+    params: { slug: note.id },
+    props: { note },
+  }));
+}
+
+const { note } = Astro.props;
+const { Content } = await render(note);
+
+const formattedDate = note.data.publishDate.toLocaleDateString("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+---
+
+<BaseLayout
+  title={`${note.data.title} — loadpath`}
+  description={note.data.description}
+>
+  <article class="px-4 pb-28 pt-14 sm:px-6 sm:pt-20">
+    <div class="mx-auto max-w-2xl">
+      <a
+        href="/system-design"
+        class="font-mono text-xs text-[var(--color-ink-faint)] transition-colors hover:text-[var(--color-accent)]"
+      >
+        ← system design
+      </a>
+
+      <div class="mt-5 flex items-center gap-3 font-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+        <time datetime={note.data.publishDate.toISOString()}>{formattedDate}</time>
+        {
+          note.data.tags.length > 0 && (
+            <>
+              <span class="h-1 w-1 rounded-full bg-[var(--color-accent-line)]" />
+              <span class="flex flex-wrap gap-2">
+                {note.data.tags.map((tag) => (
+                  <span class="text-[var(--color-accent-soft)]">{tag}</span>
+                ))}
+              </span>
+            </>
+          )
+        }
+      </div>
+
+      <h1 class="mt-4 text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl">
+        {note.data.title}
+      </h1>
+
+      <p class="mt-4 text-lg leading-relaxed text-[var(--color-ink-soft)]">
+        {note.data.description}
+      </p>
+
+      <div class="mullion-divider mt-10"></div>
+
+      <div class="prose-note mt-2">
+        <Content />
+      </div>
+    </div>
+  </article>
+</BaseLayout>
