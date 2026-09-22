@@ -1,6 +1,6 @@
 ---
 title: One Post, a Million Feeds
-description: A news feed post is written once and read in thousands of places. How that shapes the storage layout, what happens when a celebrity posts, why feed pagination needs cursors, and what you give up for fast reads.
+description: A news feed post is written once and read in thousands of places. How that shapes the storage layout, when a feed actually gets built, what happens when a celebrity posts, why feed pagination needs cursors, and what you give up for fast reads.
 publishDate: 2026-09-22
 tags: [news-feed, fan-out, caching, pagination]
 ---
@@ -36,8 +36,6 @@ So the data gets split by how it's read:
   ready to serve.
 - **Social graph.** Follower and following lists, paged, so fan-out can walk
   them in chunks.
-- **Counters.** Likes, comments and shares live apart from the post row,
-  because they change constantly while the post itself hardly ever does.
 
 ## Storing for reads
 
@@ -53,43 +51,62 @@ CREATE TABLE timeline (
 ```
 
 Or, for the hot tier, a Redis sorted set per user, capped at a few hundred
-entries. Two details make this work:
+entries. It holds **IDs only**. A popular post exists once in the post cache
+and is referenced from a million timelines as an 8-byte ID, so serving a
+feed is one timeline read plus a batched multi-get for posts that are almost
+always cached already. Time-sortable IDs give you ordering, uniqueness and a
+pagination cursor from a single column.
 
-1. **Store IDs only.** A popular post exists once in the post cache and gets
-   referenced from a million timelines as an 8-byte ID. Serving a feed takes
-   one timeline read followed by a batched multi-get to hydrate the posts.
-   The hot posts are almost always already in cache, because everyone is
-   reading the same ones.
-2. **Time-sortable IDs.** When the ID encodes creation time, a single column
-   gives you ordering, uniqueness and a pagination cursor, and you never need
-   a secondary index on `created_at`.
+## When the feed gets built
+
+A feed can be assembled at three points, and production systems use all
+three.
+
+**When a post is written (push).** Fan-out workers take the new post off a
+queue, page through the author's followers, and prepend the `post_id` to
+each follower's timeline. By the time a follower opens the app, their feed
+is already sitting in cache. This is the default path for most accounts.
+
+**When the user opens the app (pull).** The feed service fetches recent
+posts from each followed account and merges them on the spot. Writes cost
+nothing and reads cost a lot, so pull is kept for cases where push is too
+expensive or no timeline exists yet.
+
+**When the feed is served (ranking).** On a ranked feed, the precomputed
+timeline is a list of candidates. A ranking service scores a few hundred of
+them per request, because its signals (likes in the last ten minutes, what
+you just tapped on) go stale too fast to precompute.
+
+Some events force a partial rebuild:
+
+- **Follow:** backfill the new account's recent posts so the feed changes
+  right away.
+- **Unfollow:** filter that author out at read time, and clean the timeline
+  up in the background.
+- **Returning after weeks away:** inactive timelines get evicted, so the
+  first load rebuilds by pull, and push keeps it warm from then on.
+- **Scrolling past the cap:** the timeline holds a few hundred IDs, and
+  anything older falls back to pull.
 
 ## When a popular account posts
 
-With fan-out on write, a new post goes onto a queue, and workers page
-through the author's followers and prepend the `post_id` to each follower's
-timeline. For an account with 300 followers, that's cheap and done in
-milliseconds.
+Push for an account with 300 followers is a few hundred cheap writes. For an
+account with 40 million followers, it's 40 million writes, most of them for
+people who won't open the app today, and the fan-out workers back up for
+everyone else.
 
-For an account with 40 million followers, it's 40 million writes, most of
-them for people who won't open the app today. The post would also trickle
-into feeds over minutes, and every hour a celebrity posts, the fan-out
-workers are backed up for everyone else.
+So large accounts switch to pull:
 
-The standard answer is a **hybrid**:
-
-- Accounts under a follower threshold fan out on write as usual.
+- Accounts under a follower threshold fan out on write.
 - Accounts over it skip fan-out. Their recent posts go into a small
   per-author cache.
-- At read time, the feed service reads the user's precomputed timeline,
-  pulls the latest posts from the handful of large accounts they follow, and
-  merges the two by `post_id`.
+- At read time, the feed service merges the user's precomputed timeline
+  with the latest posts from the handful of large accounts they follow,
+  ordered by `post_id`.
 
-Most users follow only a few such accounts, so the read-time merge adds a
-few cache lookups instead of millions of writes. Two further refinements:
-skip fan-out entirely for users who haven't been active in weeks and rebuild
-their timeline when they return, and set the threshold from measured
-fan-out cost. A round number picked up front will be wrong.
+Most users follow only a few such accounts, so the merge costs a few cache
+lookups. Set the threshold from measured fan-out cost, because a round
+number picked up front will be wrong.
 
 ## Pagination
 
@@ -114,9 +131,8 @@ large account's cache, merge them, keep the top 20, and return the last one
 as the next cursor. Pull-to-refresh runs the same query in the other
 direction (`post_id > :newest_seen`).
 
-Ranked feeds complicate this, since scores shift between requests. The
-usual fix is to rank once per session, store that ordered snapshot briefly,
-and treat the cursor as a position in the snapshot.
+Ranked feeds rank once per session and store that ordering briefly, and the
+cursor becomes a position in it.
 
 ## The trade-offs
 
