@@ -1,6 +1,6 @@
 ---
 title: One Post, a Million Feeds
-description: A news feed post is written once and read in thousands of places. How that shapes the storage layout, when a feed actually gets built, what happens when a celebrity posts, why feed pagination needs cursors, and what you give up for fast reads.
+description: A news feed post is written once and read in thousands of places. How that shapes the storage layout, when a feed actually gets built, what happens when a celebrity posts, why feed pagination needs cursors, and which tech runs each layer.
 publishDate: 2026-09-22
 tags: [news-feed, fan-out, caching, pagination]
 ---
@@ -134,15 +134,19 @@ direction (`post_id > :newest_seen`).
 Ranked feeds rank once per session and store that ordering briefly, and the
 cursor becomes a position in it.
 
-## The trade-offs
+## The stack, layer by layer
 
-| You gain | You pay |
-|---|---|
-| Feed reads are one key lookup and a cache multi-get | Every post is copied, as an ID, into every follower's timeline |
-| Popular posts are cached once and shared | Posts reach feeds seconds late, since fan-out is asynchronous |
-| Celebrity posts cost a few reads | Read-path merge logic, plus a threshold to tune and keep tuning |
-| Stable, duplicate-free scrolling | Cursors are opaque, so "jump to page 12" is gone |
-| Timelines hold IDs, so edits show up everywhere at once | Deletes and unfollows leave stale IDs behind that hydration has to filter out |
+| Layer | Holds | Tech | Why |
+|---|---|---|---|
+| Source of truth | Post rows, keyed by `post_id` | Sharded MySQL or Postgres (Vitess, Citus) | Key lookups and single-row writes, sharded by author |
+| Post cache | Hydrated posts | Memcached | Fast multi-get across thousands of keys, and hot posts stay resident |
+| Social graph | Follower and following edges | Sharded MySQL adjacency tables behind a cache (Meta's TAO is this shape) | Fan-out needs paged follower scans, and reads need "who do I follow" |
+| Fan-out pipeline | New-post events | Kafka, partitioned by `author_id` | Absorbs bursts, keeps each author's posts in order, and replays if workers fall behind |
+| Timeline store | Every user's post ID list | Cassandra or ScyllaDB | Wide rows kept sorted by the clustering key, with cheap appends that scale out |
+| Timeline cache | The newest few hundred IDs per active user | Redis sorted sets | `ZADD` on fan-out, a range query per page, `ZREMRANGEBYRANK` to cap. Score by millisecond timestamp, since 64-bit IDs lose precision as a double |
+| Large-account cache | Recent posts from accounts over the threshold | Redis lists, one per author | Every follower's feed load reads it, so it lives in memory |
+| Ranking | Per-request candidate scores | Feature store (e.g. Feast on Redis) plus a model server | Fresh engagement signals within request latency |
+| Cursors | Position in the feed | Opaque API token, plus Redis with a TTL for ranked session snapshots | Chronological feeds need no server state, and ranked feeds need a little for a short time |
 
 The pattern underneath all of it: precompute whatever is cheap to precompute,
 merge at read time whatever is too expensive to push, and accept that a feed
