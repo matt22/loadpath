@@ -2,9 +2,7 @@ import { defineConfig } from "astro/config";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  // Update once the Cloudflare Pages project exists, in case "loadpath" is
-  // taken and Pages assigns a different *.pages.dev subdomain.
-  site: "https://loadpath.pages.dev",
+  site: "https://loadpath.cosmic-lab.workers.dev",
   vite: {
     plugins: [tailwindcss()],
   },
