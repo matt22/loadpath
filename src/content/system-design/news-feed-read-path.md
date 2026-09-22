@@ -105,6 +105,9 @@ WHERE user_id = ? AND post_id < :cursor
 LIMIT 20;
 ```
 
+> This assumes time-sortable IDs. With random or per-shard IDs, the cursor
+> becomes `(created_at, post_id)`, with the ID breaking ties.
+
 This composes with the hybrid merge because every source is sorted by the
 same key. Take up to 20 IDs below the cursor from the timeline and from each
 large account's cache, merge them, keep the top 20, and return the last one
