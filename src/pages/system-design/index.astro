@@ -1,0 +1,51 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import NoteCard from "../../components/NoteCard.astro";
+import { getCollection } from "astro:content";
+
+const notes = (await getCollection("system-design")).sort(
+  (a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf()
+);
+---
+
+<BaseLayout
+  title="System Design — loadpath"
+  description="Thought dives on system design: the nuanced calls, trade-offs, and boundaries behind how systems are actually built."
+>
+  <section class="px-4 pb-10 pt-14 sm:px-6 sm:pt-20">
+    <div class="mx-auto max-w-3xl">
+      <a
+        href="/"
+        class="font-mono text-xs text-[var(--color-ink-faint)] transition-colors hover:text-[var(--color-accent)]"
+      >
+        ← loadpath
+      </a>
+      <p class="mt-5 font-mono text-xs uppercase tracking-[0.2em] text-[var(--color-accent)]">
+        system design
+      </p>
+      <h1 class="mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl">
+        Boundaries, not blueprints.
+      </h1>
+      <p class="mt-4 max-w-xl text-base leading-relaxed text-[var(--color-ink-soft)]">
+        Not walkthroughs of famous systems — nuanced calls on when to use
+        what, and where responsibility should actually sit.
+      </p>
+    </div>
+  </section>
+
+  <section class="px-4 pb-24 sm:px-6">
+    <div class="mx-auto grid max-w-3xl gap-4">
+      {
+        notes.map((note) => (
+          <NoteCard
+            href={`/system-design/${note.id}`}
+            title={note.data.title}
+            description={note.data.description}
+            tags={note.data.tags}
+            publishDate={note.data.publishDate}
+          />
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>
