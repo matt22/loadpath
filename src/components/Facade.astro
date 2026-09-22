@@ -1,0 +1,37 @@
+---
+// Decorative skyscraper-facade motif: a row of glass panes of varying height,
+// evoking a curtain-wall elevation. Purely decorative — aria-hidden.
+interface Props {
+  class?: string;
+  panes?: number;
+}
+
+const { class: className = "", panes = 28 } = Astro.props;
+
+const heights = Array.from({ length: panes }, (_, i) => {
+  const wave = Math.sin(i * 0.7) * 0.5 + Math.sin(i * 0.31) * 0.5;
+  return 34 + wave * 22 + (i % 5 === 0 ? 10 : 0);
+});
+---
+
+<svg
+  class={className}
+  aria-hidden="true"
+  viewBox={`0 0 ${panes * 18} 100`}
+  preserveAspectRatio="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  {
+    heights.map((h, i) => (
+      <rect
+        x={i * 18 + 1}
+        y={100 - h}
+        width="14"
+        height={h}
+        rx="0.6"
+        fill="var(--color-accent)"
+        opacity={0.05 + (i % 4) * 0.035}
+      />
+    ))
+  }
+</svg>

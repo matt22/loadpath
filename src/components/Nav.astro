@@ -1,0 +1,48 @@
+---
+const links = [
+  { href: "/system-design", label: "System Design" },
+  { href: "/coding", label: "Coding", disabled: true },
+  { href: "/lld", label: "LLD", disabled: true },
+];
+---
+
+<header class="sticky top-0 z-20 px-4 pt-4 sm:px-6">
+  <div
+    class="glass-pane-strong mx-auto flex max-w-5xl items-center justify-between rounded-2xl px-5 py-3.5 shadow-[0_1px_0_rgba(15,37,68,0.03)]"
+  >
+    <a href="/" class="flex items-center gap-2.5">
+      <span
+        class="grid h-7 w-7 grid-cols-3 gap-[2px] rounded-[6px] border border-[var(--color-mullion)] bg-white/70 p-1"
+      >
+        <span class="rounded-[1px] bg-[var(--color-accent)]/70"></span>
+        <span class="rounded-[1px] bg-[var(--color-accent)]/30"></span>
+        <span class="rounded-[1px] bg-[var(--color-accent)]/70"></span>
+        <span class="rounded-[1px] bg-[var(--color-accent)]/30"></span>
+        <span class="rounded-[1px] bg-[var(--color-accent)]/70"></span>
+        <span class="rounded-[1px] bg-[var(--color-accent)]/30"></span>
+      </span>
+      <span class="font-sans text-[15px] font-semibold tracking-tight text-[var(--color-ink)]">
+        loadpath
+      </span>
+    </a>
+
+    <nav class="flex items-center gap-1 font-mono text-[13px]">
+      {
+        links.map((link) =>
+          link.disabled ? (
+            <span class="cursor-default rounded-lg px-3 py-1.5 text-[var(--color-ink-faint)]">
+              {link.label}
+            </span>
+          ) : (
+            <a
+              href={link.href}
+              class="rounded-lg px-3 py-1.5 text-[var(--color-ink-soft)] transition-colors hover:bg-[var(--color-sky-100)] hover:text-[var(--color-accent)]"
+            >
+              {link.label}
+            </a>
+          )
+        )
+      }
+    </nav>
+  </div>
+</header>
