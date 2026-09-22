@@ -16,7 +16,8 @@ easiest way to ship the next feature.
 
 ## The responsibility that keeps leaking in
 
-The tell isn't one big mistake, it's a pattern of small ones. Watch for:
+A series of small, reasonable-looking decisions is usually what gets you
+there. Watch for:
 
 - **Routing logic that encodes business rules.** A topic exchange with
   bindings like `order.*.high-value.*` means the *broker config* now knows
@@ -35,9 +36,8 @@ The tell isn't one big mistake, it's a pattern of small ones. Watch for:
   hiding in message timing. It will break the day someone adds a partition
   or a second consumer instance.
 
-The fix isn't a rule against complexity, it's a rule about *where* complexity
-is allowed to live. A queue should guarantee **delivery, ordering scope, and
-durability** — nothing about *who talks to whom next*. The moment a queue's
+Draw the line at what a queue can actually guarantee: **delivery, ordering
+scope, and durability** — never *who talks to whom next*. The moment a queue's
 configuration or a consumer's handler encodes "and then call the next
 service," that decision has quietly become load-bearing infrastructure with
 none of the visibility a real orchestrator would give it.
@@ -57,9 +57,9 @@ into the wrong place later.
 | Routing intelligence | Minimal by design — routing is a partition key, not broker logic | Rich — exchanges, bindings, dead-lettering, priority queues |
 | Throughput ceiling | Very high, built for it | High, but the broker does more work per message so it costs more at the same volume |
 
-The practical question isn't "which is more popular" — it's **does anything
-downstream need to replay history, or does every message just need to reach
-exactly one worker and be done?** Event sourcing, audit trails, analytics
+The practical question to ask: **does anything downstream need to replay
+history, or does every message just need to reach exactly one worker and be
+done?** Event sourcing, audit trails, analytics
 pipelines, and "many teams each want their own read of the same event
 stream" all point at Kafka. Job queues, RPC-style request/reply, and
 anything that needs the broker to make a routing or priority decision at
@@ -70,7 +70,8 @@ builds a bad, bespoke version of Kafka's replay log on top of it.
 
 ## Do these actually need to be distributed?
 
-Not by default — that's a separate, later decision from picking the tool.
+That's a separate question from which tool you picked, and the two engines
+answer it very differently.
 
 **Kafka is distributed by construction.** A topic's partitions are spread
 across brokers, each partition has a replication factor with an
