@@ -1,0 +1,58 @@
+---
+interface Props {
+  href: string;
+  label: string;
+  description: string;
+  count?: number;
+  disabled?: boolean;
+}
+
+const { href, label, description, count, disabled = false } = Astro.props;
+const Tag = disabled ? "div" : "a";
+---
+
+<Tag
+  href={disabled ? undefined : href}
+  class:list={[
+    "group relative flex flex-col justify-between overflow-hidden rounded-2xl p-6 transition-all duration-200",
+    disabled
+      ? "glass-pane cursor-default opacity-60"
+      : "glass-pane-strong hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-24px_rgba(30,111,217,0.45)]",
+  ]}
+>
+  <div
+    class="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-40 [background:repeating-linear-gradient(90deg,var(--color-accent)_0px,var(--color-accent)_1px,transparent_1px,transparent_14px)] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+  >
+  </div>
+
+  <div class="relative">
+    <div class="flex items-center justify-between">
+      <h2 class="font-sans text-lg font-semibold tracking-tight text-[var(--color-ink)]">
+        {label}
+      </h2>
+      {
+        disabled ? (
+          <span class="font-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+            soon
+          </span>
+        ) : (
+          <span class="font-mono text-[10px] uppercase tracking-wider text-[var(--color-accent-soft)]">
+            {count} {count === 1 ? "dive" : "dives"}
+          </span>
+        )
+      }
+    </div>
+    <p class="mt-2 text-sm leading-relaxed text-[var(--color-ink-soft)]">
+      {description}
+    </p>
+  </div>
+
+  {
+    !disabled && (
+      <span class="relative mt-6 inline-flex items-center gap-1.5 font-mono text-xs text-[var(--color-accent)]">
+        enter
+        <span class="transition-transform duration-200 group-hover:translate-x-1">→</span>
+      </span>
+    )
+  }
+</Tag>
