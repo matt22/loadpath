@@ -48,6 +48,17 @@ Both get reached for as "the message queue," but they're solving different
 problems, and the wrong pick is usually what forces responsibility to leak
 into the wrong place later.
 
+The practical question to ask: **does anything downstream need to replay
+history, or does every message just need to reach exactly one worker and be
+done?** Event sourcing, audit trails, analytics pipelines, and "many teams
+each want their own read of the same event stream" all point at Kafka. Job
+queues, RPC-style request/reply, and anything that needs the broker to make
+a routing or priority decision at delivery time point at RabbitMQ. Picking
+Kafka for a task queue usually means reinventing acknowledgment and retry
+semantics RabbitMQ gives you for free; picking RabbitMQ for an event stream
+usually means someone eventually builds a bad, bespoke version of Kafka's
+replay log on top of it.
+
 | | Kafka | RabbitMQ |
 |---|---|---|
 | Model | Append-only log, partitioned; consumers pull and track their own offset | Smart broker; pushes messages, tracks per-message state |
@@ -56,17 +67,8 @@ into the wrong place later.
 | Replay | Native — offsets are just a pointer into the log | Not native — consumed messages are gone unless you built retention yourself |
 | Routing intelligence | Minimal by design — routing is a partition key, not broker logic | Rich — exchanges, bindings, dead-lettering, priority queues |
 | Throughput ceiling | Very high, built for it | High, but the broker does more work per message so it costs more at the same volume |
-
-The practical question to ask: **does anything downstream need to replay
-history, or does every message just need to reach exactly one worker and be
-done?** Event sourcing, audit trails, analytics
-pipelines, and "many teams each want their own read of the same event
-stream" all point at Kafka. Job queues, RPC-style request/reply, and
-anything that needs the broker to make a routing or priority decision at
-delivery time point at RabbitMQ. Picking Kafka for a task queue usually
-means reinventing acknowledgment and retry semantics RabbitMQ gives you for
-free; picking RabbitMQ for an event stream usually means someone eventually
-builds a bad, bespoke version of Kafka's replay log on top of it.
+| Distribution makeup | Inherent — partitions spread across brokers, each replicated across an in-sync-replica (ISR) set | Optional — a single node handles real load by default; HA comes from quorum queues (Raft-based) when you need it |
+| Example fit | A clickstream/activity-event pipeline where a dashboard, a warehouse loader, and a fraud-detection service each independently replay the same stream | A file-upload service dispatching each upload to workers for virus scanning, thumbnailing, and transcoding — each job acked and retried on its own |
 
 ## Do these actually need to be distributed?
 
